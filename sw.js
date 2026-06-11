@@ -1,12 +1,12 @@
-const CACHE_NAME = "pwa-2048-v2";
+const CACHE_NAME = "pwa-2048-v3";
 const APP_FILES = [
   "./",
   "./2048.html",
   "./manifest.webmanifest",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
-  "./icons/icon-192.svg",
-  "./icons/icon-512.svg"
+  "./icon-192.png",
+  "./icon-512.png",
+  "./icon-192.svg",
+  "./icon-512.svg"
 ];
 
 self.addEventListener("install", event => {
