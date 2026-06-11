@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#d9edf7" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="application-name" content="2048" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icons/icon-192.png" type="image/png" />
+  <link rel="icon" href="./icons/icon-192.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <title>2048</title>
+  <style>
+    :root {
+      --bg: #d9edf7;
+      --bg2: #f7e4ed;
+      --panel: rgba(255, 255, 255, .58);
+      --panel-strong: rgba(255, 255, 255, .82);
+      --text: #f4b6ca;
+      --deep: #5f6f85;
+      --accent: #e86f8d;
+      --accent2: #86c8dd;
+      --board: #9fb4c6;
+      --cell: rgba(255, 255, 255, .42);
+      --tile-2: #fff7fb;
+      --tile-4: #f7e8f0;
+      --tile-8: #f0bfd0;
+      --tile-16: #e8a9bf;
+      --tile-32: #de86a2;
+      --tile-64: #d76688;
+      --tile-128: #9dd6e4;
+      --tile-256: #75c4d9;
+      --tile-512: #54acc6;
+      --tile-text-low: #6f6074;
+      --tile-text-high: #ffffff;
+      --tile-super: linear-gradient(135deg, #e86f8d, #86c8dd);
+      --shadow: 0 24px 70px rgba(66, 83, 104, .20);
+      --gap: clamp(9px, 2.35vw, 15px);
+      --board-size: min(86vw, 455px);
+      --cell-size: calc((var(--board-size) - var(--gap) * 5) / 4);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--deep);
+      font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+      background:
+        radial-gradient(circle at 16% 14%, color-mix(in srgb, var(--bg2) 62%, transparent), transparent 28%),
+        radial-gradient(circle at 84% 18%, color-mix(in srgb, var(--accent2) 38%, transparent), transparent 26%),
+        linear-gradient(135deg, var(--bg), var(--bg2));
+      overflow-x: hidden;
+      user-select: none;
+      touch-action: manipulation;
+      transition: background .35s ease;
+    }
+
+    button, input { font: inherit; }
+    button {
+      border: 0;
+      cursor: pointer;
+      color: var(--deep);
+      background: transparent;
+    }
+
+    .page {
+      min-height: 100vh;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .page.active { display: flex; }
+
+    .shell {
+      width: min(94vw, 560px);
+      border: 1px solid rgba(255,255,255,.62);
+      border-radius: 34px;
+      padding: clamp(20px, 4vw, 34px);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(22px);
+    }
+
+    .home {
+      text-align: center;
+      background: linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,.16));
+    }
+
+    .title {
+      margin: 0 0 34px;
+      color: var(--text);
+      font-size: clamp(74px, 18vw, 126px);
+      line-height: .86;
+      letter-spacing: -7px;
+      text-shadow: 0 6px 0 rgba(255,255,255,.35), 0 16px 30px rgba(146, 110, 132, .18);
+    }
+
+    .menu {
+      display: grid;
+      gap: 16px;
+      width: min(360px, 100%);
+      margin: 0 auto;
+    }
+
+    .menu-btn, .soft-btn, .slot, .scheme {
+      min-height: 56px;
+      border: 2px solid color-mix(in srgb, var(--accent) 44%, white);
+      border-radius: 0;
+      color: var(--text);
+      background: rgba(255,255,255,.22);
+      font-size: 22px;
+      font-weight: 850;
+      letter-spacing: 2px;
+      transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
+    }
+    .menu-btn:hover, .soft-btn:hover, .slot:hover, .scheme:hover {
+      transform: translateY(-2px);
+      background: rgba(255,255,255,.42);
+      box-shadow: 0 14px 30px rgba(90, 101, 125, .14);
+    }
+    .menu-btn:active, .soft-btn:active, .slot:active, .scheme:active { transform: translateY(1px) scale(.99); }
+
+    .sub-title {
+      margin: 0 0 22px;
+      color: var(--text);
+      font-size: clamp(34px, 9vw, 58px);
+      letter-spacing: -2px;
+      text-align: center;
+    }
+
+    .sub-note {
+      margin: -8px auto 24px;
+      max-width: 430px;
+      text-align: center;
+      line-height: 1.7;
+      color: color-mix(in srgb, var(--deep) 78%, white);
+    }
+
+    .choice-grid, .settings-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .choice-card {
+      padding: 20px;
+      border: 1px solid rgba(255,255,255,.58);
+      border-radius: 24px;
+      text-align: left;
+      background: rgba(255,255,255,.43);
+      box-shadow: 0 12px 28px rgba(82, 94, 113, .10);
+    }
+    .choice-card strong {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--accent);
+      font-size: 24px;
+    }
+    .choice-card span { color: color-mix(in srgb, var(--deep) 78%, white); line-height: 1.55; }
+
+    .top-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .mini-btn {
+      min-height: 40px;
+      padding: 0 15px;
+      border-radius: 999px;
+      color: var(--deep);
+      font-weight: 800;
+      background: rgba(255,255,255,.52);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.5);
+    }
+
+    .game-shell {
+      width: min(96vw, 620px);
+      padding: clamp(16px, 3.2vw, 26px);
+    }
+
+    .game-head {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .score-card {
+      min-height: 64px;
+      padding: 10px 8px;
+      border-radius: 18px;
+      text-align: center;
+      background: var(--panel-strong);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 10px 24px rgba(72, 86, 108, .10);
+    }
+    .score-card small {
+      display: block;
+      color: color-mix(in srgb, var(--deep) 62%, white);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 1px;
+    }
+    .score-card b {
+      display: block;
+      margin-top: 3px;
+      color: var(--accent);
+      font-size: clamp(20px, 5vw, 28px);
+    }
+    .save-open {
+      width: 100%;
+      height: 100%;
+      color: var(--accent);
+      font-weight: 900;
+      font-size: 20px;
+    }
+
+    .game-controls {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .board-wrap {
+      position: relative;
+      width: var(--board-size);
+      height: var(--board-size);
+      margin: 0 auto;
+      padding: var(--gap);
+      border-radius: 28px;
+      background: linear-gradient(145deg, color-mix(in srgb, var(--board) 86%, white), color-mix(in srgb, var(--board) 82%, black));
+      box-shadow: inset 0 4px 12px rgba(255,255,255,.30), 0 24px 46px rgba(76, 88, 106, .20);
+      cursor: grab;
+      touch-action: none;
+    }
+    .board-wrap:active { cursor: grabbing; }
+
+    .grid-layer, .tile-layer {
+      position: absolute;
+      inset: var(--gap);
+    }
+    .grid-layer {
+      display: grid;
+      grid-template: repeat(4, 1fr) / repeat(4, 1fr);
+      gap: var(--gap);
+    }
+    .grid-cell {
+      border-radius: 17px;
+      background: var(--cell);
+      box-shadow: inset 0 2px 5px rgba(255,255,255,.20);
+    }
+
+    .tile {
+      position: absolute;
+      width: var(--cell-size);
+      height: var(--cell-size);
+      display: grid;
+      place-items: center;
+      border-radius: 17px;
+      color: #6a5b50;
+      font-weight: 950;
+      font-size: clamp(28px, 8vw, 50px);
+      transform: translate(var(--x), var(--y)) scale(1);
+      transition: transform 145ms cubic-bezier(.2,.9,.32,1.16);
+      box-shadow: inset 0 2px 0 rgba(255,255,255,.38), 0 10px 20px rgba(57, 68, 86, .14);
+      will-change: transform;
+    }
+    .tile.new { animation: appear .18s ease-out; }
+    .tile.merged { animation: pop .22s ease-out .13s; }
+    @keyframes appear {
+      from { opacity: 0; transform: translate(var(--x), var(--y)) scale(.45); }
+      to { opacity: 1; transform: translate(var(--x), var(--y)) scale(1); }
+    }
+    @keyframes pop {
+      0% { transform: translate(var(--x), var(--y)) scale(1); }
+      52% { transform: translate(var(--x), var(--y)) scale(1.15); }
+      100% { transform: translate(var(--x), var(--y)) scale(1); }
+    }
+
+    .tile[data-value="2"] { background: var(--tile-2); color: var(--tile-text-low); }
+    .tile[data-value="4"] { background: var(--tile-4); color: var(--tile-text-low); }
+    .tile[data-value="8"] { background: var(--tile-8); color: var(--tile-text-high); }
+    .tile[data-value="16"] { background: var(--tile-16); color: var(--tile-text-high); }
+    .tile[data-value="32"] { background: var(--tile-32); color: var(--tile-text-high); }
+    .tile[data-value="64"] { background: var(--tile-64); color: var(--tile-text-high); }
+    .tile[data-value="128"] { background: var(--tile-128); color: var(--tile-text-high); font-size: clamp(24px, 7vw, 42px); }
+    .tile[data-value="256"] { background: var(--tile-256); color: var(--tile-text-high); font-size: clamp(24px, 7vw, 42px); }
+    .tile[data-value="512"] { background: var(--tile-512); color: var(--tile-text-high); font-size: clamp(24px, 7vw, 42px); }
+    .tile[data-value="1024"], .tile[data-value="2048"] { background: var(--tile-super); color: var(--tile-text-high); font-size: clamp(20px, 6vw, 36px); }
+    .tile.super { background: var(--tile-super); color: var(--tile-text-high); font-size: clamp(18px, 5.5vw, 32px); }
+
+    .overlay {
+      position: absolute;
+      inset: var(--gap);
+      z-index: 20;
+      display: none;
+      place-items: center;
+      border-radius: 22px;
+      background: rgba(255,255,255,.72);
+      backdrop-filter: blur(10px);
+    }
+    .overlay.show { display: grid; }
+    .modal {
+      width: min(82%, 330px);
+      padding: 26px 22px;
+      border-radius: 28px;
+      text-align: center;
+      background: var(--panel-strong);
+      box-shadow: 0 20px 42px rgba(67, 77, 96, .20);
+    }
+    .modal h2 { margin: 0 0 8px; color: var(--accent); font-size: 30px; }
+    .modal p { margin: 0 0 18px; line-height: 1.6; }
+
+    .slot-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .slot {
+      min-height: 72px;
+      padding: 9px 11px;
+      text-align: left;
+      font-size: 15px;
+      letter-spacing: 0;
+      border-radius: 18px;
+    }
+    .slot strong { display: block; color: var(--accent); font-size: 17px; }
+    .slot span { display: block; margin-top: 4px; color: color-mix(in srgb, var(--deep) 72%, white); font-size: 13px; line-height: 1.35; }
+
+    .range-row {
+      padding: 16px;
+      border-radius: 22px;
+      background: rgba(255,255,255,.42);
+    }
+    .range-row label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+      color: var(--accent);
+      font-weight: 900;
+    }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+    .schemes {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 11px;
+    }
+    .scheme {
+      min-height: 58px;
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: 18px;
+      text-align: left;
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+    .swatch {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.72);
+      box-shadow: inset 19px 0 0 var(--c1), inset -19px 0 0 var(--c2);
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      z-index: 80;
+      max-width: min(88vw, 420px);
+      padding: 11px 16px;
+      border-radius: 999px;
+      color: var(--deep);
+      background: rgba(255,255,255,.84);
+      box-shadow: 0 14px 34px rgba(64, 76, 92, .17);
+      opacity: 0;
+      transform: translate(-50%, 16px);
+      pointer-events: none;
+      transition: .22s ease;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (max-width: 560px) {
+      .page { padding: 14px; align-items: flex-start; }
+      .shell { min-height: calc(100vh - 28px); display: flex; flex-direction: column; justify-content: center; border-radius: 28px; }
+      .game-shell { justify-content: flex-start; }
+      .game-head { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+      .score-card { min-height: 58px; padding: 8px 5px; }
+      .slot-grid, .schemes { grid-template-columns: 1fr; }
+      .mini-btn { padding: 0 12px; }
+    }
+  </style>
+</head>
+<body>
+  <section id="homePage" class="page active">
+    <div class="shell home">
+      <h1 class="title">2048</h1>
+      <div class="menu">
+        <button class="menu-btn" data-page="newPage">重新开始</button>
+        <button class="menu-btn" id="continueBtn">继续游戏</button>
+        <button class="menu-btn" data-page="loadPage">读档</button>
+        <button class="menu-btn" data-page="settingsPage">设置</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="newPage" class="page">
+    <div class="shell">
+      <div class="top-actions"><button class="mini-btn" data-page="homePage">返回</button></div>
+      <h2 class="sub-title">选择模式</h2>
+      <p class="sub-note">选择撤销规则后进入游戏。撤销只回退棋盘和分数，不锁定随机数，所以撤销后再次行动，新方块的位置和数字都可能变化。</p>
+      <div class="choice-grid">
+        <button class="choice-card" id="startSingle">
+          <strong>一次撤销</strong>
+          <span>每次只能撤销到上一步；撤销后需要再走一步，才能再次撤销。</span>
+        </button>
+        <button class="choice-card" id="startEndless">
+          <strong>无尽撤销</strong>
+          <span>保留完整回退历史，可以连续撤销到本局开始时。</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section id="gamePage" class="page">
+    <div class="shell game-shell">
+      <div class="top-actions">
+        <button class="mini-btn" data-page="homePage">主页</button>
+        <button class="mini-btn" id="modeTag">一次撤销</button>
+      </div>
+      <div class="game-head">
+        <div class="score-card"><small>当前分数</small><b id="score">0</b></div>
+        <div class="score-card"><small>最佳分数</small><b id="best">0</b></div>
+        <div class="score-card"><button class="save-open" id="saveOpen">存档</button></div>
+      </div>
+      <div class="game-controls">
+        <button class="mini-btn" id="undoBtn">撤销</button>
+        <button class="mini-btn" id="restartBtn">重新开始</button>
+        <button class="mini-btn" data-page="loadPage">读档</button>
+      </div>
+      <div class="board-wrap" id="board">
+        <div class="grid-layer">
+          <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+          <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+          <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+          <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+        </div>
+        <div class="tile-layer" id="tiles"></div>
+        <div class="overlay" id="overlay">
+          <div class="modal">
+            <h2 id="modalTitle">游戏结束</h2>
+            <p id="modalText">没有可移动的格子了。</p>
+            <button class="mini-btn" id="againBtn">重新开始</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="savePage" class="page">
+    <div class="shell">
+      <div class="top-actions"><button class="mini-btn" data-page="gamePage">返回游戏</button></div>
+      <h2 class="sub-title">存档</h2>
+      <p class="sub-note">选择一个位置保存当前游戏进程，最多保留 10 个存档。</p>
+      <div class="slot-grid" id="saveSlots"></div>
+    </div>
+  </section>
+
+  <section id="loadPage" class="page">
+    <div class="shell">
+      <div class="top-actions"><button class="mini-btn" data-page="homePage">返回主页</button></div>
+      <h2 class="sub-title">读档</h2>
+      <p class="sub-note">选择一个已有存档继续游戏。空位置不会覆盖当前进程。</p>
+      <div class="slot-grid" id="loadSlots"></div>
+    </div>
+  </section>
+
+  <section id="settingsPage" class="page">
+    <div class="shell">
+      <div class="top-actions"><button class="mini-btn" data-page="homePage">返回</button></div>
+      <h2 class="sub-title">设置</h2>
+      <div class="settings-grid">
+        <div class="range-row">
+          <label>背景音量 <span id="volumeText">30%</span></label>
+          <input id="volumeRange" type="range" min="0" max="100" value="30" />
+        </div>
+        <div>
+          <p class="sub-note">配色方案</p>
+          <div class="schemes" id="schemeList"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const SIZE = 4;
+    const MOVE_DELAY = 165;
+    const KEY = {
+      current: "multi-page-2048-current",
+      best: "multi-page-2048-best",
+      slots: "multi-page-2048-slots",
+      settings: "multi-page-2048-settings"
+    };
+
+    const schemes = [
+      { name: "天青 × 浅粉", bg: "#d9edf7", bg2: "#f7e4ed", text: "#f4b6ca", deep: "#5f6f85", accent: "#e86f8d", accent2: "#86c8dd", board: "#9fb4c6", tiles: ["#fff7fb","#f7e8f0","#f0bfd0","#e8a9bf","#de86a2","#d76688","#9dd6e4","#75c4d9","#54acc6"], tileLow: "#6f6074", tileHigh: "#ffffff", tileSuper: "linear-gradient(135deg,#e86f8d,#86c8dd)" },
+      { name: "天青 × 正红", bg: "#d8f0ef", bg2: "#f7e8df", text: "#e34b4b", deep: "#42525f", accent: "#d72f35", accent2: "#78c5c8", board: "#8fb5b8", tiles: ["#f8ffff","#e5f5f4","#a8dcdc","#79c8ca","#ef8a7d","#df5b55","#c93e42","#b92d35","#9f2430"], tileLow: "#42525f", tileHigh: "#ffffff", tileSuper: "linear-gradient(135deg,#d72f35,#78c5c8)" },
+      { name: "雾灰 × 粉色", bg: "#e8eaec", bg2: "#f8dfe8", text: "#e9a6bc", deep: "#5f6670", accent: "#d989a7", accent2: "#aeb7bf", board: "#a7adb5", tiles: ["#f7f8f8","#eceff1","#d7dce1","#c8cfd6","#e8bfd0","#dda5bc","#cd839f","#bb6f8d","#9f607b"], tileLow: "#5f6670", tileHigh: "#ffffff", tileSuper: "linear-gradient(135deg,#d989a7,#aeb7bf)" },
+      { name: "米白 × 靛蓝", bg: "#f4eadb", bg2: "#e6edf7", text: "#6f85c8", deep: "#4f5666", accent: "#5067b1", accent2: "#d7b98b", board: "#a6aec4", tiles: ["#fffaf0","#f2e5cf","#d7c5a4","#bfa77c","#9da9d8","#7f91cc","#6378bd","#4f64ae","#3e518f"], tileLow: "#4f5666", tileHigh: "#ffffff", tileSuper: "linear-gradient(135deg,#5067b1,#d7b98b)" },
+      { name: "奶油 × 橄榄", bg: "#f6efd8", bg2: "#e3ead8", text: "#99a85a", deep: "#5d634d", accent: "#8a9850", accent2: "#d4b06c", board: "#aab18a", tiles: ["#fff9e8","#f0e8c8","#ddd5a3","#c5bd7f","#aebb7d","#95a45f","#7d8c4b","#68763e","#586633"], tileLow: "#5d634d", tileHigh: "#ffffff", tileSuper: "linear-gradient(135deg,#8a9850,#d4b06c)" },
+      { name: "暮紫 × 杏橙", bg: "#ebe3f4", bg2: "#ffe3cf", text: "#c8916a", deep: "#62566d", accent: "#c57b59", accent2: "#ad95cf", board: "#aa99bd", tiles: ["#fff3ea","#f3e6f8","#dcccf1","#c7b0e7","#f0bea0","#df9a75","#cc7d5d","#b9674d","#9b5744"], tileLow: "#62566d", tileHigh: "#ffffff", tileSuper: "linear-gradient(135deg,#c57b59,#ad95cf)" },
+      { name: "瓷蓝 × 珊瑚", bg: "#e5f1f6", bg2: "#ffe6dd", text: "#f08b75", deep: "#4d6470", accent: "#e56f5b", accent2: "#79b9d4", board: "#8bb3c5", tiles: ["#f7fcff","#e2f2f8","#c2e1ed","#9bcbdc","#f5b1a2","#ed917f","#e07164","#c95b52","#ad4b45"], tileLow: "#4d6470", tileHigh: "#ffffff", tileSuper: "linear-gradient(135deg,#e56f5b,#79b9d4)" },
+      { name: "墨绿 × 香槟", bg: "#dfe9df", bg2: "#f7ecd5", text: "#c4a15e", deep: "#40574d", accent: "#b99148", accent2: "#6f9b85", board: "#789987", tiles: ["#fbf5e6","#eee4c9","#ddcc9f","#c9b172","#9fc2ad","#7fac92","#629579","#4d8065","#3d6b54"], tileLow: "#40574d", tileHigh: "#ffffff", tileSuper: "linear-gradient(135deg,#b99148,#6f9b85)" },
+      { name: "砂岩 × 酒红", bg: "#efe1d1", bg2: "#f2dbe0", text: "#b85d72", deep: "#66554f", accent: "#a83d58", accent2: "#d4a878", board: "#b99c84", tiles: ["#fff2e6","#ead7c4","#d7b999","#c69d78","#dea7af","#c98292","#b45f74","#9d455e","#85364e"], tileLow: "#66554f", tileHigh: "#ffffff", tileSuper: "linear-gradient(135deg,#a83d58,#d4a878)" },
+      { name: "夜蓝 × 银粉", bg: "#dce3ef", bg2: "#f4dde8", text: "#caa8bc", deep: "#46536a", accent: "#bd7f9d", accent2: "#8798bd", board: "#818fa9", tiles: ["#f6f8fc","#e4e9f2","#cad3e3","#aebbd3","#dcc1cf","#c99db4","#b77d9c","#9f6586","#845471"], tileLow: "#46536a", tileHigh: "#ffffff", tileSuper: "linear-gradient(135deg,#bd7f9d,#8798bd)" }
+    ];
+
+    const pages = [...document.querySelectorAll(".page")];
+    const tilesEl = document.getElementById("tiles");
+    const boardEl = document.getElementById("board");
+    const scoreEl = document.getElementById("score");
+    const bestEl = document.getElementById("best");
+    const overlayEl = document.getElementById("overlay");
+    const modalTitleEl = document.getElementById("modalTitle");
+    const modalTextEl = document.getElementById("modalText");
+    const modeTag = document.getElementById("modeTag");
+    const toastEl = document.getElementById("toast");
+    const saveSlotsEl = document.getElementById("saveSlots");
+    const loadSlotsEl = document.getElementById("loadSlots");
+    const volumeRange = document.getElementById("volumeRange");
+    const volumeText = document.getElementById("volumeText");
+    const schemeList = document.getElementById("schemeList");
+
+    let grid = emptyGrid();
+    let score = 0;
+    let mode = "single";
+    let history = [];
+    let nextId = 1;
+    let locked = false;
+    let wonShown = false;
+    let best = Number(localStorage.getItem(KEY.best) || 0);
+    let pointerStart = null;
+    let toastTimer = null;
+    let audioCtx = null;
+    let musicGain = null;
+    let musicOsc = [];
+    let settings = loadJson(KEY.settings, { volume: 30, scheme: 0 });
+    let slots = loadJson(KEY.slots, Array(10).fill(null));
+
+    bestEl.textContent = best;
+    applyScheme(settings.scheme);
+    buildSchemes();
+    syncVolume();
+
+    function emptyGrid() {
+      return Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
+    }
+
+    function loadJson(key, fallback) {
+      try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+      catch { return fallback; }
+    }
+
+    function saveJson(key, value) {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+
+    function cloneGrid(source) {
+      return source.map(row => row.map(tile => tile ? { ...tile, isNew: false, merged: false } : null));
+    }
+
+    function snapshot() {
+      return { grid: cloneGrid(grid), score, mode, history: history.map(h => ({ grid: cloneGrid(h.grid), score: h.score })), nextId, wonShown };
+    }
+
+    function restore(data) {
+      if (!data) return false;
+      grid = cloneGrid(data.grid || emptyGrid());
+      score = data.score || 0;
+      mode = data.mode || "single";
+      history = (data.history || []).map(h => ({ grid: cloneGrid(h.grid), score: h.score || 0 }));
+      nextId = data.nextId || getMaxId() + 1;
+      wonShown = Boolean(data.wonShown);
+      locked = false;
+      overlayEl.classList.remove("show");
+      updateHeader();
+      render();
+      persistCurrent();
+      return true;
+    }
+
+    function getMaxId() {
+      let max = 0;
+      grid.flat().forEach(t => { if (t) max = Math.max(max, t.id || 0); });
+      return max;
+    }
+
+    function showPage(id) {
+      pages.forEach(p => p.classList.toggle("active", p.id === id));
+      if (id === "savePage") renderSlots("save");
+      if (id === "loadPage") renderSlots("load");
+      if (id === "gamePage") render();
+    }
+
+    function startNew(nextMode) {
+      mode = nextMode;
+      grid = emptyGrid();
+      score = 0;
+      history = [];
+      nextId = 1;
+      locked = false;
+      wonShown = false;
+      overlayEl.classList.remove("show");
+      addRandomTile();
+      addRandomTile();
+      updateHeader();
+      render();
+      persistCurrent();
+      showPage("gamePage");
+      startMusic();
+    }
+
+    function addRandomTile() {
+      const empty = [];
+      for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) if (!grid[r][c]) empty.push({ r, c });
+      if (!empty.length) return;
+      const spot = empty[Math.floor(Math.random() * empty.length)];
+      grid[spot.r][spot.c] = { id: nextId++, value: Math.random() < .9 ? 2 : 4, isNew: true, merged: false };
+    }
+
+    function getTileOffset(index) {
+      return `calc(${index} * (var(--cell-size) + var(--gap)))`;
+    }
+
+    function render() {
+      const existing = new Map([...tilesEl.children].map(el => [Number(el.dataset.id), el]));
+      const activeIds = new Set();
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const tile = grid[r][c];
+          if (!tile) continue;
+          activeIds.add(tile.id);
+          let el = existing.get(tile.id);
+          if (!el) {
+            el = document.createElement("div");
+            el.className = "tile";
+            el.dataset.id = tile.id;
+            tilesEl.appendChild(el);
+          }
+          el.style.setProperty("--x", getTileOffset(c));
+          el.style.setProperty("--y", getTileOffset(r));
+          el.dataset.value = tile.value;
+          el.textContent = tile.value;
+          el.classList.toggle("new", Boolean(tile.isNew));
+          el.classList.toggle("merged", Boolean(tile.merged));
+          el.classList.toggle("super", tile.value > 2048);
+          el.style.zIndex = tile.value;
+        }
+      }
+      existing.forEach((el, id) => { if (!activeIds.has(id)) el.remove(); });
+      setTimeout(() => {
+        grid.flat().forEach(t => { if (t) { t.isNew = false; t.merged = false; } });
+        [...tilesEl.children].forEach(el => el.classList.remove("new", "merged"));
+      }, 240);
+    }
+
+    function updateHeader() {
+      scoreEl.textContent = score;
+      bestEl.textContent = best;
+      modeTag.textContent = mode === "single" ? "一次撤销" : "无尽撤销";
+    }
+
+    function move(direction) {
+      if (locked) return;
+      startMusic();
+      const before = { grid: cloneGrid(grid), score };
+      const result = calculateMove(direction);
+      if (!result.moved) {
+        playTone(120, .035, "square", .012);
+        return;
+      }
+      if (mode === "single") history = [before];
+      else history.push(before);
+      locked = true;
+      grid = result.grid;
+      score += result.gained;
+      if (score > best) {
+        best = score;
+        localStorage.setItem(KEY.best, best);
+      }
+      updateHeader();
+      result.gained ? playMerge(result.gained) : playTone(190, .05, "triangle", .022);
+      render();
+      setTimeout(() => {
+        addRandomTile();
+        render();
+        locked = false;
+        persistCurrent();
+        if (!wonShown && hasValue(2048)) {
+          wonShown = true;
+          showMessage("达成 2048", "你可以继续挑战更高分。", false);
+        } else if (isGameOver()) {
+          showMessage("游戏结束", `最终分数：${score}`, true);
+        }
+      }, MOVE_DELAY);
+    }
+
+    function calculateMove(direction) {
+      const newGrid = emptyGrid();
+      let moved = false;
+      let gained = 0;
+      const vertical = direction === "up" || direction === "down";
+      const reverse = direction === "right" || direction === "down";
+      for (let line = 0; line < SIZE; line++) {
+        const cells = [];
+        for (let i = 0; i < SIZE; i++) {
+          const r = vertical ? i : line;
+          const c = vertical ? line : i;
+          cells.push(grid[r][c]);
+        }
+        const ordered = reverse ? [...cells].reverse() : [...cells];
+        const compact = ordered.filter(Boolean);
+        const merged = [];
+        for (let i = 0; i < compact.length; i++) {
+          const cur = { ...compact[i], isNew: false, merged: false };
+          if (compact[i + 1] && compact[i + 1].value === cur.value) {
+            cur.value *= 2;
+            cur.id = nextId++;
+            cur.merged = true;
+            gained += cur.value;
+            i++;
+          }
+          merged.push(cur);
+        }
+        while (merged.length < SIZE) merged.push(null);
+        const finalLine = reverse ? merged.reverse() : merged;
+        for (let i = 0; i < SIZE; i++) {
+          const r = vertical ? i : line;
+          const c = vertical ? line : i;
+          newGrid[r][c] = finalLine[i];
+          const oldTile = grid[r][c];
+          const newTile = newGrid[r][c];
+          if ((oldTile?.id || 0) !== (newTile?.id || 0) || (oldTile?.value || 0) !== (newTile?.value || 0)) moved = true;
+        }
+      }
+      return { grid: newGrid, moved, gained };
+    }
+
+    function undo() {
+      if (!history.length || locked) {
+        toast(mode === "single" ? "现在不能撤销，需要先走一步。" : "没有可撤销的步骤。");
+        return;
+      }
+      const prev = history.pop();
+      grid = cloneGrid(prev.grid);
+      score = prev.score;
+      if (mode === "single") history = [];
+      overlayEl.classList.remove("show");
+      locked = false;
+      updateHeader();
+      render();
+      persistCurrent();
+      playTone(260, .07, "triangle", .028);
+    }
+
+    function persistCurrent() {
+      saveJson(KEY.current, snapshot());
+    }
+
+    function continueGame() {
+      const data = loadJson(KEY.current, null);
+      if (data && restore(data)) {
+        showPage("gamePage");
+        startMusic();
+      } else {
+        toast("没有可继续的游戏，请先重新开始。");
+      }
+    }
+
+    function renderSlots(type) {
+      slots = loadJson(KEY.slots, Array(10).fill(null));
+      const el = type === "save" ? saveSlotsEl : loadSlotsEl;
+      el.innerHTML = "";
+      slots.forEach((slot, index) => {
+        const btn = document.createElement("button");
+        btn.className = "slot";
+        const label = `位置 ${index + 1}`;
+        if (slot) {
+          const date = new Date(slot.time).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+          btn.innerHTML = `<strong>${label}</strong><span>分数 ${slot.score || 0} · ${slot.mode === "endless" ? "无尽撤销" : "一次撤销"}<br>${date}</span>`;
+        } else {
+          btn.innerHTML = `<strong>${label}</strong><span>空存档位</span>`;
+        }
+        btn.onclick = () => type === "save" ? saveToSlot(index) : loadFromSlot(index);
+        el.appendChild(btn);
+      });
+    }
+
+    function saveToSlot(index) {
+      slots[index] = { ...snapshot(), time: Date.now() };
+      saveJson(KEY.slots, slots);
+      renderSlots("save");
+      toast(`已保存到位置 ${index + 1}`);
+    }
+
+    function loadFromSlot(index) {
+      if (!slots[index]) {
+        toast("这个位置还是空的。");
+        return;
+      }
+      restore(slots[index]);
+      showPage("gamePage");
+      startMusic();
+      toast(`已读取位置 ${index + 1}`);
+    }
+
+    function hasValue(value) {
+      return grid.some(row => row.some(tile => tile && tile.value >= value));
+    }
+
+    function isGameOver() {
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const tile = grid[r][c];
+          if (!tile) return false;
+          if (r < SIZE - 1 && grid[r + 1][c]?.value === tile.value) return false;
+          if (c < SIZE - 1 && grid[r][c + 1]?.value === tile.value) return false;
+        }
+      }
+      return true;
+    }
+
+    function showMessage(title, text, gameOver) {
+      modalTitleEl.textContent = title;
+      modalTextEl.textContent = text;
+      overlayEl.classList.add("show");
+      locked = gameOver;
+      if (!gameOver) setTimeout(() => { overlayEl.classList.remove("show"); locked = false; }, 1300);
+    }
+
+    function directionFromDelta(dx, dy) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 26) return null;
+      return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+    }
+
+    function buildSchemes() {
+      schemeList.innerHTML = "";
+      schemes.forEach((s, i) => {
+        const btn = document.createElement("button");
+        btn.className = "scheme";
+        btn.innerHTML = `<span class="swatch" style="--c1:${s.bg};--c2:${s.accent}"></span><span>${s.name}</span>`;
+        btn.onclick = () => {
+          settings.scheme = i;
+          saveJson(KEY.settings, settings);
+          applyScheme(i);
+          toast(`已切换为「${s.name}」`);
+        };
+        schemeList.appendChild(btn);
+      });
+    }
+
+    function applyScheme(index) {
+      const s = schemes[index] || schemes[0];
+      const root = document.documentElement.style;
+      root.setProperty("--bg", s.bg);
+      root.setProperty("--bg2", s.bg2);
+      root.setProperty("--text", s.text);
+      root.setProperty("--deep", s.deep);
+      root.setProperty("--accent", s.accent);
+      root.setProperty("--accent2", s.accent2);
+      root.setProperty("--board", s.board);
+      root.setProperty("--cell", "rgba(255,255,255,.42)");
+      ["2", "4", "8", "16", "32", "64", "128", "256", "512"].forEach((value, i) => {
+        root.setProperty(`--tile-${value}`, s.tiles[i]);
+      });
+      root.setProperty("--tile-text-low", s.tileLow);
+      root.setProperty("--tile-text-high", s.tileHigh);
+      root.setProperty("--tile-super", s.tileSuper);
+    }
+
+    function syncVolume() {
+      volumeRange.value = settings.volume;
+      volumeText.textContent = `${settings.volume}%`;
+      if (musicGain) musicGain.gain.value = settings.volume / 100 * .045;
+    }
+
+    function startMusic() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        musicGain = audioCtx.createGain();
+        musicGain.gain.value = settings.volume / 100 * .045;
+        musicGain.connect(audioCtx.destination);
+        [196, 246.94, 329.63].forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = "sine";
+          osc.frequency.value = freq;
+          gain.gain.value = i === 0 ? .48 : .22;
+          osc.connect(gain).connect(musicGain);
+          osc.start();
+          musicOsc.push(osc);
+        });
+      }
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      syncVolume();
+    }
+
+    function playTone(freq, duration, type = "sine", gainValue = .04) {
+      if (!audioCtx) return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(.0001, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(gainValue, audioCtx.currentTime + .012);
+      gain.gain.exponentialRampToValueAtTime(.0001, audioCtx.currentTime + duration);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration + .02);
+    }
+
+    function playMerge(gained) {
+      playTone(240, .07, "triangle", .035);
+      setTimeout(() => playTone(Math.min(980, 360 + Math.log2(gained) * 42), .1, "sine", .05), 45);
+    }
+
+    function toast(text) {
+      clearTimeout(toastTimer);
+      toastEl.textContent = text;
+      toastEl.classList.add("show");
+      toastTimer = setTimeout(() => toastEl.classList.remove("show"), 1800);
+    }
+
+    document.querySelectorAll("[data-page]").forEach(btn => btn.addEventListener("click", () => showPage(btn.dataset.page)));
+    document.getElementById("startSingle").onclick = () => startNew("single");
+    document.getElementById("startEndless").onclick = () => startNew("endless");
+    document.getElementById("continueBtn").onclick = continueGame;
+    document.getElementById("saveOpen").onclick = () => showPage("savePage");
+    document.getElementById("undoBtn").onclick = undo;
+    document.getElementById("restartBtn").onclick = () => showPage("newPage");
+    document.getElementById("againBtn").onclick = () => startNew(mode);
+    volumeRange.oninput = () => {
+      settings.volume = Number(volumeRange.value);
+      saveJson(KEY.settings, settings);
+      startMusic();
+      syncVolume();
+    };
+
+    window.addEventListener("keydown", e => {
+      const map = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", w: "up", s: "down", a: "left", d: "right" };
+      if (map[e.key] && document.getElementById("gamePage").classList.contains("active")) {
+        e.preventDefault();
+        move(map[e.key]);
+      }
+    }, { passive: false });
+
+    boardEl.addEventListener("pointerdown", e => {
+      pointerStart = { x: e.clientX, y: e.clientY };
+      boardEl.setPointerCapture?.(e.pointerId);
+      startMusic();
+    });
+    boardEl.addEventListener("pointermove", e => { if (pointerStart) e.preventDefault(); }, { passive: false });
+    boardEl.addEventListener("pointerup", e => {
+      if (!pointerStart) return;
+      const dir = directionFromDelta(e.clientX - pointerStart.x, e.clientY - pointerStart.y);
+      pointerStart = null;
+      if (dir) move(dir);
+    });
+    boardEl.addEventListener("pointercancel", () => { pointerStart = null; });
+    window.addEventListener("resize", render);
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
