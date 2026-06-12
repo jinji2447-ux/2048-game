@@ -221,10 +221,27 @@
 
     .game-controls {
       display: flex;
-      justify-content: center;
+      justify-content: flex-end;
       flex-wrap: wrap;
       gap: 10px;
-      margin-bottom: 16px;
+      margin-top: 16px;
+    }
+
+    .control-btn {
+      min-width: 78px;
+      box-shadow: 0 10px 22px rgba(72, 86, 108, .12), inset 0 1px 0 rgba(255,255,255,.55);
+    }
+    .undo-btn {
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 72%, var(--accent2)));
+    }
+    .restart-btn {
+      color: var(--deep);
+      background: linear-gradient(135deg, rgba(255,255,255,.84), color-mix(in srgb, var(--accent) 18%, white));
+    }
+    .load-btn {
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent2), color-mix(in srgb, var(--accent2) 74%, var(--deep)));
     }
 
     .board-wrap {
@@ -298,12 +315,12 @@
     .overlay {
       position: absolute;
       inset: var(--gap);
-      z-index: 20;
+      z-index: 999;
       display: none;
       place-items: center;
       border-radius: 22px;
-      background: rgba(255,255,255,.72);
-      backdrop-filter: blur(10px);
+      background: rgba(255,255,255,.82);
+      backdrop-filter: blur(12px);
     }
     .overlay.show { display: grid; }
     .modal {
@@ -395,9 +412,12 @@
     @media (max-width: 560px) {
       .page { padding: 14px; align-items: flex-start; }
       .shell { min-height: calc(100vh - 28px); display: flex; flex-direction: column; justify-content: center; border-radius: 28px; }
-      .game-shell { justify-content: flex-start; }
+      .game-shell { justify-content: flex-start; padding-top: clamp(34px, 7vh, 72px); }
       .game-head { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
       .score-card { min-height: 58px; padding: 8px 5px; }
+      .board-wrap { margin-top: 12px; }
+      .game-controls { justify-content: flex-end; margin-top: 18px; padding-right: 4px; }
+      .undo-btn { min-width: 104px; min-height: 48px; font-size: 17px; }
       .slot-grid, .schemes { grid-template-columns: 1fr; }
       .mini-btn { padding: 0 12px; }
     }
@@ -438,17 +458,11 @@
     <div class="shell game-shell">
       <div class="top-actions">
         <button class="mini-btn" data-page="homePage">主页</button>
-        <button class="mini-btn" id="modeTag">一次撤销</button>
       </div>
       <div class="game-head">
         <div class="score-card"><small>当前分数</small><b id="score">0</b></div>
         <div class="score-card"><small>最佳分数</small><b id="best">0</b></div>
         <div class="score-card"><button class="save-open" id="saveOpen">存档</button></div>
-      </div>
-      <div class="game-controls">
-        <button class="mini-btn" id="undoBtn">撤销</button>
-        <button class="mini-btn" id="restartBtn">重新开始</button>
-        <button class="mini-btn" data-page="loadPage">读档</button>
       </div>
       <div class="board-wrap" id="board">
         <div class="grid-layer">
@@ -465,6 +479,11 @@
             <button class="mini-btn" id="againBtn">重新开始</button>
           </div>
         </div>
+      </div>
+      <div class="game-controls">
+        <button class="mini-btn control-btn restart-btn" id="restartBtn">重新开始</button>
+        <button class="mini-btn control-btn load-btn" data-page="loadPage">读档</button>
+        <button class="mini-btn control-btn undo-btn" id="undoBtn">撤销</button>
       </div>
     </div>
   </section>
@@ -493,8 +512,12 @@
       <h2 class="sub-title">设置</h2>
       <div class="settings-grid">
         <div class="range-row">
-          <label>背景音量 <span id="volumeText">30%</span></label>
-          <input id="volumeRange" type="range" min="0" max="100" value="30" />
+          <label>背景音乐 <span id="bgmVolumeText">12%</span></label>
+          <input id="bgmVolumeRange" type="range" min="0" max="100" value="12" />
+        </div>
+        <div class="range-row">
+          <label>点击音效 <span id="sfxVolumeText">55%</span></label>
+          <input id="sfxVolumeRange" type="range" min="0" max="100" value="55" />
         </div>
         <div>
           <p class="sub-note">配色方案</p>
@@ -537,12 +560,13 @@
     const overlayEl = document.getElementById("overlay");
     const modalTitleEl = document.getElementById("modalTitle");
     const modalTextEl = document.getElementById("modalText");
-    const modeTag = document.getElementById("modeTag");
     const toastEl = document.getElementById("toast");
     const saveSlotsEl = document.getElementById("saveSlots");
     const loadSlotsEl = document.getElementById("loadSlots");
-    const volumeRange = document.getElementById("volumeRange");
-    const volumeText = document.getElementById("volumeText");
+    const bgmVolumeRange = document.getElementById("bgmVolumeRange");
+    const bgmVolumeText = document.getElementById("bgmVolumeText");
+    const sfxVolumeRange = document.getElementById("sfxVolumeRange");
+    const sfxVolumeText = document.getElementById("sfxVolumeText");
     const schemeList = document.getElementById("schemeList");
 
     let grid = emptyGrid();
@@ -557,9 +581,11 @@
     let toastTimer = null;
     let audioCtx = null;
     let musicGain = null;
-    let musicOsc = [];
+    let musicTimer = null;
     let settings = loadJson(KEY.settings, { volume: 30, scheme: 0 });
     let slots = loadJson(KEY.slots, Array(10).fill(null));
+
+    settings = normalizeSettings(settings);
 
     bestEl.textContent = best;
     applyScheme(settings.scheme);
@@ -577,6 +603,18 @@
 
     function saveJson(key, value) {
       localStorage.setItem(key, JSON.stringify(value));
+    }
+
+    function normalizeSettings(raw) {
+      const oldVolume = Number(raw?.volume);
+      const normalized = {
+        scheme: Number.isInteger(raw?.scheme) ? raw.scheme : 0,
+        bgmVolume: Number.isFinite(raw?.bgmVolume) ? raw.bgmVolume : (Number.isFinite(oldVolume) ? Math.min(oldVolume, 12) : 12),
+        sfxVolume: Number.isFinite(raw?.sfxVolume) ? raw.sfxVolume : 55
+      };
+      normalized.bgmVolume = Math.max(0, Math.min(100, normalized.bgmVolume));
+      normalized.sfxVolume = Math.max(0, Math.min(100, normalized.sfxVolume));
+      return normalized;
     }
 
     function cloneGrid(source) {
@@ -668,7 +706,7 @@
           el.classList.toggle("new", Boolean(tile.isNew));
           el.classList.toggle("merged", Boolean(tile.merged));
           el.classList.toggle("super", tile.value > 2048);
-          el.style.zIndex = tile.value;
+          el.style.zIndex = Math.min(30, Math.round(Math.log2(tile.value)) + 1);
         }
       }
       existing.forEach((el, id) => { if (!activeIds.has(id)) el.remove(); });
@@ -681,7 +719,6 @@
     function updateHeader() {
       scoreEl.textContent = score;
       bestEl.textContent = best;
-      modeTag.textContent = mode === "single" ? "一次撤销" : "无尽撤销";
     }
 
     function move(direction) {
@@ -847,6 +884,7 @@
     function showMessage(title, text, gameOver) {
       modalTitleEl.textContent = title;
       modalTextEl.textContent = text;
+      document.getElementById("againBtn").style.display = gameOver ? "inline-flex" : "none";
       overlayEl.classList.add("show");
       locked = gameOver;
       if (!gameOver) setTimeout(() => { overlayEl.classList.remove("show"); locked = false; }, 1300);
@@ -893,40 +931,58 @@
     }
 
     function syncVolume() {
-      volumeRange.value = settings.volume;
-      volumeText.textContent = `${settings.volume}%`;
-      if (musicGain) musicGain.gain.value = settings.volume / 100 * .045;
+      bgmVolumeRange.value = settings.bgmVolume;
+      sfxVolumeRange.value = settings.sfxVolume;
+      bgmVolumeText.textContent = `${settings.bgmVolume}%`;
+      sfxVolumeText.textContent = `${settings.sfxVolume}%`;
+      if (musicGain) musicGain.gain.value = settings.bgmVolume / 100 * .055;
     }
 
     function startMusic() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         musicGain = audioCtx.createGain();
-        musicGain.gain.value = settings.volume / 100 * .045;
         musicGain.connect(audioCtx.destination);
-        [196, 246.94, 329.63].forEach((freq, i) => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = "sine";
-          osc.frequency.value = freq;
-          gain.gain.value = i === 0 ? .48 : .22;
-          osc.connect(gain).connect(musicGain);
-          osc.start();
-          musicOsc.push(osc);
-        });
       }
       if (audioCtx.state === "suspended") audioCtx.resume();
       syncVolume();
+      if (!musicTimer) {
+        musicTimer = setInterval(playSoftBgmPhrase, 6200);
+        setTimeout(playSoftBgmPhrase, 900);
+      }
+    }
+
+    function playSoftBgmPhrase() {
+      if (!audioCtx || !musicGain || settings.bgmVolume <= 0) return;
+      [523.25, 659.25, 783.99, 659.25].forEach((freq, i) => {
+        playMusicNote(freq, i * .32, .34);
+      });
+    }
+
+    function playMusicNote(freq, delay, duration) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const start = audioCtx.currentTime + delay;
+      gain.gain.setValueAtTime(.0001, start);
+      gain.gain.exponentialRampToValueAtTime(.28, start + .035);
+      gain.gain.exponentialRampToValueAtTime(.0001, start + duration);
+      osc.connect(gain).connect(musicGain);
+      osc.start(start);
+      osc.stop(start + duration + .03);
     }
 
     function playTone(freq, duration, type = "sine", gainValue = .04) {
       if (!audioCtx) return;
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
+      const volume = settings.sfxVolume / 100;
+      if (volume <= 0) return;
       osc.type = type;
       osc.frequency.value = freq;
       gain.gain.setValueAtTime(.0001, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(gainValue, audioCtx.currentTime + .012);
+      gain.gain.exponentialRampToValueAtTime(gainValue * volume, audioCtx.currentTime + .012);
       gain.gain.exponentialRampToValueAtTime(.0001, audioCtx.currentTime + duration);
       osc.connect(gain).connect(audioCtx.destination);
       osc.start();
@@ -951,13 +1007,20 @@
     document.getElementById("continueBtn").onclick = continueGame;
     document.getElementById("saveOpen").onclick = () => showPage("savePage");
     document.getElementById("undoBtn").onclick = undo;
-    document.getElementById("restartBtn").onclick = () => showPage("newPage");
+    document.getElementById("restartBtn").onclick = () => startNew(mode);
     document.getElementById("againBtn").onclick = () => startNew(mode);
-    volumeRange.oninput = () => {
-      settings.volume = Number(volumeRange.value);
+    bgmVolumeRange.oninput = () => {
+      settings.bgmVolume = Number(bgmVolumeRange.value);
       saveJson(KEY.settings, settings);
       startMusic();
       syncVolume();
+    };
+    sfxVolumeRange.oninput = () => {
+      settings.sfxVolume = Number(sfxVolumeRange.value);
+      saveJson(KEY.settings, settings);
+      syncVolume();
+      startMusic();
+      playTone(520, .06, "sine", .025);
     };
 
     window.addEventListener("keydown", e => {
@@ -965,6 +1028,23 @@
       if (map[e.key] && document.getElementById("gamePage").classList.contains("active")) {
         e.preventDefault();
         move(map[e.key]);
+        return;
+      }
+      if (document.getElementById("gamePage").classList.contains("active")) {
+        const key = e.key.toLowerCase();
+        if (key === "z") {
+          e.preventDefault();
+          undo();
+        } else if (key === "r") {
+          e.preventDefault();
+          startNew(mode);
+        } else if (key === "l") {
+          e.preventDefault();
+          showPage("loadPage");
+        } else if (key === "s") {
+          e.preventDefault();
+          showPage("savePage");
+        }
       }
     }, { passive: false });
 
