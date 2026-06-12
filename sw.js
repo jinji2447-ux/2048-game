@@ -1,4 +1,4 @@
-const CACHE_NAME = "pwa-2048-v4";
+const CACHE_NAME = "pwa-2048-v5";
 const APP_FILES = [
   "./",
   "./2048.html",

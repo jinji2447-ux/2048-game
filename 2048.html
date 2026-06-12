@@ -333,6 +333,16 @@
     }
     .modal h2 { margin: 0 0 8px; color: var(--accent); font-size: 30px; }
     .modal p { margin: 0 0 18px; line-height: 1.6; }
+    .modal-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .modal-actions .mini-btn {
+      min-width: 96px;
+      min-height: 42px;
+    }
 
     .slot-grid {
       display: grid;
@@ -476,7 +486,10 @@
           <div class="modal">
             <h2 id="modalTitle">游戏结束</h2>
             <p id="modalText">没有可移动的格子了。</p>
-            <button class="mini-btn" id="againBtn">重新开始</button>
+            <div class="modal-actions">
+              <button class="mini-btn restart-btn" id="againBtn" type="button">重新开始</button>
+              <button class="mini-btn undo-btn" id="modalUndoBtn" type="button">撤销</button>
+            </div>
           </div>
         </div>
       </div>
@@ -797,8 +810,8 @@
       return { grid: newGrid, moved, gained };
     }
 
-    function undo() {
-      if (!history.length || locked) {
+    function undo(fromGameOver = false) {
+      if (!history.length || (locked && !fromGameOver)) {
         toast(mode === "single" ? "现在不能撤销，需要先走一步。" : "没有可撤销的步骤。");
         return;
       }
@@ -812,6 +825,9 @@
       render();
       persistCurrent();
       playTone(260, .07, "triangle", .028);
+      if (fromGameOver && isGameOver()) {
+        setTimeout(() => showMessage("游戏结束", `最终分数：${score}`, true), 260);
+      }
     }
 
     function persistCurrent() {
@@ -885,6 +901,7 @@
       modalTitleEl.textContent = title;
       modalTextEl.textContent = text;
       document.getElementById("againBtn").style.display = gameOver ? "inline-flex" : "none";
+      document.getElementById("modalUndoBtn").style.display = gameOver ? "inline-flex" : "none";
       overlayEl.classList.add("show");
       locked = gameOver;
       if (!gameOver) setTimeout(() => { overlayEl.classList.remove("show"); locked = false; }, 1300);
@@ -1009,6 +1026,7 @@
     document.getElementById("undoBtn").onclick = undo;
     document.getElementById("restartBtn").onclick = () => startNew(mode);
     document.getElementById("againBtn").onclick = () => startNew(mode);
+    document.getElementById("modalUndoBtn").onclick = () => undo(true);
     bgmVolumeRange.oninput = () => {
       settings.bgmVolume = Number(bgmVolumeRange.value);
       saveJson(KEY.settings, settings);
