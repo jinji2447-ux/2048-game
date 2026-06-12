@@ -1067,6 +1067,7 @@
     }, { passive: false });
 
     boardEl.addEventListener("pointerdown", e => {
+      if (e.target.closest(".modal")) return;
       pointerStart = { x: e.clientX, y: e.clientY };
       boardEl.setPointerCapture?.(e.pointerId);
       startMusic();
@@ -1079,6 +1080,8 @@
       if (dir) move(dir);
     });
     boardEl.addEventListener("pointercancel", () => { pointerStart = null; });
+    document.querySelector(".modal").addEventListener("pointerdown", e => e.stopPropagation());
+    document.querySelector(".modal").addEventListener("pointerup", e => e.stopPropagation());
     window.addEventListener("resize", render);
 
     if ("serviceWorker" in navigator) {
